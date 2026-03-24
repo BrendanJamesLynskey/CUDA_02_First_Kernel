@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your First CUDA Kernel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-card: #0d1117;
+            --bg-code: #161b22;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #76B900;
+            --accent-dim: #76B90044;
+            --accent-glow: #76B90033;
+            --border: #21262d;
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --font-body: 'Inter', sans-serif;
+            --max-width: 900px;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* ── Header ── */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .series-label {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 .accent {
+            color: var(--accent);
+        }
+
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin-bottom: 2rem;
+        }
+
+        /* ── Tag Pills ── */
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            background: var(--accent-dim);
+            white-space: nowrap;
+        }
+
+        /* ── Pipeline Flow Bar ── */
+        .pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            margin-bottom: 1rem;
+            max-width: var(--max-width);
+        }
+
+        .pipeline-step {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.3rem 0.7rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .pipeline-arrow {
+            color: var(--accent);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        /* ── Slides ── */
+        .slide {
+            min-height: 100vh;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 4rem 1.5rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .slide-number {
+            font-family: var(--font-display);
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-dim);
+            position: absolute;
+            top: 2rem;
+            right: 1.5rem;
+            line-height: 1;
+            user-select: none;
+        }
+
+        .slide h2 {
+            font-family: var(--font-display);
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            line-height: 1.25;
+        }
+
+        .slide h3 {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .slide p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .slide p strong {
+            color: var(--text-primary);
+        }
+
+        .slide ul, .slide ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        .slide li {
+            margin-bottom: 0.4rem;
+        }
+
+        .slide li strong {
+            color: var(--text-primary);
+        }
+
+        /* ── Code Blocks ── */
+        .code-block {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.25rem 0;
+            overflow: hidden;
+        }
+
+        .code-header {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(118, 185, 0, 0.08);
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .code-block pre {
+            margin: 0;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #c9d1d9;
+        }
+
+        /* Syntax highlighting (manual) */
+        .kw { color: #ff7b72; }
+        .fn { color: #d2a8ff; }
+        .str { color: #a5d6ff; }
+        .cm { color: #8b949e; font-style: italic; }
+        .num { color: #79c0ff; }
+        .type { color: #ffa657; }
+        .dir { color: #ff7b72; }
+        .mac { color: #ffa657; }
+
+        /* ── Tables ── */
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: var(--bg-code);
+            color: var(--accent);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-display);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:nth-child(even) td {
+            background: rgba(13, 17, 23, 0.5);
+        }
+
+        /* ── Diagrams ── */
+        .diagram-flow {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-box {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .diagram-box.accent {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(118, 185, 0, 0.08);
+        }
+
+        .diagram-box.dim {
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
+
+        .diagram-arrow {
+            color: var(--accent);
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        /* Vertical flow diagrams */
+        .diagram-vertical {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-vertical .diagram-arrow {
+            font-size: 1.1rem;
+        }
+
+        /* Grid diagram */
+        .diagram-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-grid.cols-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .diagram-grid.cols-3 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .diagram-panel {
+            padding: 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+
+        .diagram-panel.accent-border {
+            border-left: 3px solid var(--accent);
+        }
+
+        .diagram-panel h4 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .diagram-panel p, .diagram-panel ul {
+            font-size: 0.85rem;
+        }
+
+        /* ── Callout Boxes ── */
+        .callout {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+        }
+
+        .callout p {
+            margin-bottom: 0;
+        }
+
+        .callout .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+        }
+
+        /* ── Contents list ── */
+        .contents-list {
+            list-style: none;
+            padding-left: 0;
+            counter-reset: contents;
+        }
+
+        .contents-list li {
+            counter-increment: contents;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .contents-list li:last-child {
+            border-bottom: none;
+        }
+
+        .contents-list li::before {
+            content: counter(contents, decimal-leading-zero);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 2rem;
+        }
+
+        .contents-list a {
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .contents-list a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            .slide {
+                padding: 3rem 1rem;
+                min-height: auto;
+            }
+
+            .slide-number {
+                font-size: 3rem;
+                top: 1.5rem;
+                right: 1rem;
+            }
+
+            .slide h2 {
+                font-size: 1.5rem;
+            }
+
+            .diagram-grid.cols-2,
+            .diagram-grid.cols-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .pipeline {
+                gap: 0.15rem;
+            }
+
+            .pipeline-step {
+                font-size: 0.6rem;
+                padding: 0.2rem 0.4rem;
+            }
+
+            .hero h1 {
+                font-size: 1.8rem;
+            }
+
+            table {
+                font-size: 0.78rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════ HERO ════════════════════════════════════════════ -->
+<header class="hero">
+    <div class="series-label">CUDA Programming Series — Tutorial 02</div>
+    <h1>Your First <span class="accent">CUDA Kernel</span></h1>
+    <p class="subtitle">From nvcc setup to vector addition — host/device workflow, memory allocation, kernel launch syntax, error handling.</p>
+
+    <div class="tags">
+        <span class="tag">CUDA</span>
+        <span class="tag">nvcc</span>
+        <span class="tag">Kernels</span>
+        <span class="tag">Host/Device</span>
+        <span class="tag">Memory Management</span>
+        <span class="tag">Error Handling</span>
+    </div>
+
+    <div class="pipeline">
+        <span class="pipeline-step">Setup</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Host vs Device</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Workflow</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Vector Add</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Launch Syntax</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Error Handling</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Compiling</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Exercises</span>
+    </div>
+</header>
+
+<!-- ═══════════════════════════════ SLIDE 00 — Contents ═══════════════════════════════ -->
+<section class="slide" id="slide-00">
+    <div class="slide-number">00</div>
+    <h2>Topics We'll Cover</h2>
+    <p>This tutorial takes you from installing the CUDA toolkit to writing, compiling, and running your first GPU kernel. By the end you will have a complete, working vector addition program.</p>
+    <ul class="contents-list">
+        <li><a href="#slide-01">Setting Up the CUDA Toolkit</a></li>
+        <li><a href="#slide-02">Host vs Device</a></li>
+        <li><a href="#slide-03">The CUDA Workflow</a></li>
+        <li><a href="#slide-04">Hello World — Vector Addition</a></li>
+        <li><a href="#slide-05">Kernel Launch Syntax Deep Dive</a></li>
+        <li><a href="#slide-06">Error Handling</a></li>
+        <li><a href="#slide-07">Compiling &amp; Running</a></li>
+        <li><a href="#slide-08">Exercises</a></li>
+        <li><a href="#slide-09">Summary &amp; Next Steps</a></li>
+    </ul>
+    <div class="callout">
+        <div class="callout-label">Prerequisites</div>
+        <p><strong><a href="https://brendanjameslynskey.github.io/CUDA_01_GPU_Architecture/" style="color: var(--accent); text-decoration: none;">Tutorial 01 — GPU Architecture &amp; the CUDA Execution Model</a></strong>. You should understand SMs, warps, and the thread hierarchy before writing your first kernel.</p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════ SLIDE 01 — Setting Up ═══════════════════════════════ -->
+<section class="slide" id="slide-01">
+    <div class="slide-number">01</div>
+    <h2>Setting Up the CUDA Toolkit</h2>
+
+    <p>Before writing any GPU code you need the <strong>CUDA Toolkit</strong>, which includes the <strong>nvcc</strong> compiler, runtime libraries, and developer tools.</p>
+
+    <h3>Installation by Platform</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Platform</th>
+                    <th>Method</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Linux (Ubuntu/Fedora)</strong></td>
+                    <td>NVIDIA .run installer or package manager</td>
+                    <td>Preferred: <code>apt install nvidia-cuda-toolkit</code> or download from <a href="https://developer.nvidia.com/cuda-downloads" style="color: var(--accent);">developer.nvidia.com</a></td>
+                </tr>
+                <tr>
+                    <td><strong>Windows</strong></td>
+                    <td>CUDA Toolkit installer (.exe)</td>
+                    <td>Requires Visual Studio with C++ workload installed first</td>
+                </tr>
+                <tr>
+                    <td><strong>macOS</strong></td>
+                    <td>Not supported since CUDA 10.2</td>
+                    <td>Use Google Colab or a remote Linux machine instead</td>
+                </tr>
+                <tr>
+                    <td><strong>Google Colab</strong></td>
+                    <td>Pre-installed — zero setup</td>
+                    <td>Free tier gives T4 GPU; great for learning</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Verify Your Installation</h3>
+    <div class="code-block">
+        <div class="code-header">terminal</div>
+        <pre><code><span class="cm"># Check the CUDA compiler version</span>
+$ nvcc --version
+nvcc: NVIDIA (R) Cuda compiler driver
+Cuda compilation tools, release <span class="num">12.6</span>, V12.6.77
+
+<span class="cm"># Check GPU driver &amp; device info</span>
+$ nvidia-smi
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI <span class="num">560.35</span>    Driver Version: <span class="num">560.35</span>    CUDA Version: <span class="num">12.6</span>     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|===============================+======================+======================|
+|   <span class="num">0</span>  NVIDIA GeForce ...  Off  | 00000000:01:00.0  On |                  N/A |
++-------------------------------+----------------------+----------------------+</code></pre>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">DGX Spark</div>
+        <p>If you have access to an NVIDIA DGX Spark, the CUDA toolkit is <strong>pre-installed</strong>. Just <code>ssh</code> in and start coding — no setup required.</p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════ SLIDE 02 — Host vs Device ═══════════════════════════════ -->
+<section class="slide" id="slide-02">
+    <div class="slide-number">02</div>
+    <h2>Host vs Device</h2>
+
+    <p>In CUDA programming, your code runs on two processors. The <strong>host</strong> (CPU) orchestrates everything: allocating memory, launching kernels, and copying data. The <strong>device</strong> (GPU) executes the parallel work.</p>
+
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Host (CPU)</h4>
+            <ul>
+                <li>Runs <code>main()</code> and sequential code</li>
+                <li>Allocates host &amp; device memory</li>
+                <li>Copies data between host &amp; device</li>
+                <li>Launches kernels on the GPU</li>
+                <li>Compiled by your system C++ compiler</li>
+            </ul>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Device (GPU)</h4>
+            <ul>
+                <li>Runs kernel functions in parallel</li>
+                <li>Has its own memory (VRAM)</li>
+                <li>Thousands of threads execute simultaneously</li>
+                <li>Cannot directly access host memory</li>
+                <li>Compiled by <code>nvcc</code> to PTX/SASS</li>
+            </ul>
+        </div>
+    </div>
+
+    <h3>Function Qualifiers</h3>
+    <p>CUDA extends C++ with three function qualifiers that tell the compiler <strong>where a function runs</strong> and <strong>who can call it</strong>.</p>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Qualifier</th>
+                    <th>Executes On</th>
+                    <th>Callable From</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code><span class="kw">__global__</span></code></td>
+                    <td>Device (GPU)</td>
+                    <td>Host (CPU)</td>
+                    <td>Kernel entry point — this is what you launch with <code>&lt;&lt;&lt;...&gt;&gt;&gt;</code></td>
+                </tr>
+                <tr>
+                    <td><code><span class="kw">__device__</span></code></td>
+                    <td>Device (GPU)</td>
+                    <td>Device (GPU)</td>
+                    <td>Helper function called from within a kernel</td>
+                </tr>
+                <tr>
+                    <td><code><span class="kw">__host__</span></code></td>
+                    <td>Host (CPU)</td>
+                    <td>Host (CPU)</td>
+                    <td>Normal CPU function (default if no qualifier)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="code-block">
+        <div class="code-header">function_qualifiers.cu</div>
+        <pre><code><span class="cm">// Runs on GPU, called from CPU</span>
+<span class="kw">__global__</span> <span class="type">void</span> <span class="fn">myKernel</span>(<span class="type">float</span>* data, <span class="type">int</span> n) {
+    <span class="type">int</span> idx = blockIdx.x * blockDim.x + threadIdx.x;
+    <span class="kw">if</span> (idx &lt; n) data[idx] *= <span class="num">2.0f</span>;
+}
+
+<span class="cm">// Runs on GPU, called from GPU only</span>
+<span class="kw">__device__</span> <span class="type">float</span> <span class="fn">square</span>(<span class="type">float</span> x) {
+    <span class="kw">return</span> x * x;
+}
+
+<span class="cm">// Runs on CPU (default — __host__ is optional)</span>
+<span class="kw">__host__</span> <span class="type">void</span> <span class="fn">printResult</span>(<span class="type">float</span>* data, <span class="type">int</span> n) {
+    <span class="kw">for</span> (<span class="type">int</span> i = <span class="num">0</span>; i &lt; n; i++) <span class="fn">printf</span>(<span class="str">"%f\n"</span>, data[i]);
+}</code></pre>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">Tip</div>
+        <p>You can combine <code><span class="kw">__host__</span></code> and <code><span class="kw">__device__</span></code> on the same function to compile it for <strong>both</strong> CPU and GPU. Useful for utility functions like <code>max()</code> or <code>clamp()</code>.</p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════ SLIDE 03 — The CUDA Workflow ═══════════════════════════════ -->
+<section class="slide" id="slide-03">
+    <div class="slide-number">03</div>
+    <h2>The CUDA Workflow</h2>
+
+    <p>Every CUDA program follows the same five-step pattern. The host (CPU) is responsible for orchestrating data movement and kernel execution.</p>
+
+    <div class="diagram-vertical">
+        <div class="diagram-box" style="min-width: 280px;"><strong>1.</strong> Allocate device memory</div>
+        <div class="diagram-arrow">&darr;</div>
+        <div class="diagram-box accent" style="min-width: 280px;"><strong>2.</strong> Copy data Host &rarr; Device</div>
+        <div class="diagram-arrow">&darr;</div>
+        <div class="diagram-box" style="min-width: 280px;"><strong>3.</strong> Launch kernel on GPU</div>
+        <div class="diagram-arrow">&darr;</div>
+        <div class="diagram-box accent" style="min-width: 280px;"><strong>4.</strong> Copy results Device &rarr; Host</div>
+        <div class="diagram-arrow">&darr;</div>
+        <div class="diagram-box" style="min-width: 280px;"><strong>5.</strong> Free device memory</div>
+    </div>
+
+    <h3>The API Calls</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Step</th>
+                    <th>CUDA Function</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Allocate</strong></td>
+                    <td><code><span class="fn">cudaMalloc</span>(&amp;d_ptr, size)</code></td>
+                    <td>Allocate <code>size</code> bytes on GPU global memory</td>
+                </tr>
+                <tr>
+                    <td><strong>Copy H&rarr;D</strong></td>
+                    <td><code><span class="fn">cudaMemcpy</span>(d_ptr, h_ptr, size, cudaMemcpyHostToDevice)</code></td>
+                    <td>Copy data from host to device</td>
+                </tr>
+                <tr>
+                    <td><strong>Launch</strong></td>
+                    <td><code><span class="fn">kernel</span>&lt;&lt;&lt;grid, block&gt;&gt;&gt;(args...)</code></td>
+                    <td>Execute kernel with specified grid/block dimensions</td>
+                </tr>
+                <tr>
+                    <td><strong>Copy D&rarr;H</strong></td>
+                    <td><code><span class="fn">cudaMemcpy</span>(h_ptr, d_ptr, size, cudaMemcpyDeviceToHost)</code></td>
+                    <td>Copy results from device to host</td>
+                </tr>
+                <tr>
+                    <td><strong>Free</strong></td>
+                    <td><code><span class="fn">cudaFree</span>(d_ptr)</code></td>
+                    <td>Free device memory allocation</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">Key Insight</div>
+        <p>Host and device have <strong>separate address spaces</strong>. You cannot dereference a device pointer on the host or vice versa. Data must be explicitly copied across the PCIe bus (or NVLink). This transfer overhead is why you want to maximise computation per byte transferred.</p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════ SLIDE 04 — Vector Addition ═══════════════════════════════ -->
+<section class="slide" id="slide-04">
+    <div class="slide-number">04</div>
+    <h2>Hello World — Vector Addition</h2>
+
+    <p>Vector addition is the "Hello World" of CUDA: simple enough to understand immediately, yet it demonstrates every step of the host/device workflow. This is a <strong>complete, compilable program</strong>.</p>
+
+    <div class="code-block">
+        <div class="code-header">vector_add.cu — complete program</div>
+        <pre><code><span class="dir">#include</span> <span class="str">&lt;stdio.h&gt;</span>
+<span class="dir">#include</span> <span class="str">&lt;stdlib.h&gt;</span>
+<span class="dir">#include</span> <span class="str">&lt;cuda_runtime.h&gt;</span>
+
+<span class="cm">// ── The kernel: each thread computes one element ──</span>
+<span class="kw">__global__</span> <span class="type">void</span> <span class="fn">vectorAdd</span>(<span class="kw">const</span> <span class="type">float</span>* a, <span class="kw">const</span> <span class="type">float</span>* b, <span class="type">float</span>* c, <span class="type">int</span> n) {
+    <span class="type">int</span> idx = blockIdx.x * blockDim.x + threadIdx.x;
+    <span class="kw">if</span> (idx &lt; n) {
+        c[idx] = a[idx] + b[idx];
+    }
+}
+
+<span class="type">int</span> <span class="fn">main</span>(<span class="type">void</span>) {
+    <span class="type">int</span> n = <span class="num">1000000</span>;                     <span class="cm">// 1 million elements</span>
+    <span class="type">size_t</span> size = n * <span class="kw">sizeof</span>(<span class="type">float</span>);
+
+    <span class="cm">// ── Step 0: Allocate and initialise host memory ──</span>
+    <span class="type">float</span>* h_a = (<span class="type">float</span>*)<span class="fn">malloc</span>(size);
+    <span class="type">float</span>* h_b = (<span class="type">float</span>*)<span class="fn">malloc</span>(size);
+    <span class="type">float</span>* h_c = (<span class="type">float</span>*)<span class="fn">malloc</span>(size);
+
+    <span class="kw">for</span> (<span class="type">int</span> i = <span class="num">0</span>; i &lt; n; i++) {
+        h_a[i] = <span class="num">1.0f</span>;
+        h_b[i] = <span class="num">2.0f</span>;
+    }
+
+    <span class="cm">// ── Step 1: Allocate device memory ──</span>
+    <span class="type">float</span>* d_a;
+    <span class="type">float</span>* d_b;
+    <span class="type">float</span>* d_c;
+    <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_a, size);
+    <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_b, size);
+    <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_c, size);
+
+    <span class="cm">// ── Step 2: Copy input data Host → Device ──</span>
+    <span class="fn">cudaMemcpy</span>(d_a, h_a, size, cudaMemcpyHostToDevice);
+    <span class="fn">cudaMemcpy</span>(d_b, h_b, size, cudaMemcpyHostToDevice);
+
+    <span class="cm">// ── Step 3: Launch the kernel ──</span>
+    <span class="type">int</span> blockSize = <span class="num">256</span>;                  <span class="cm">// threads per block</span>
+    <span class="type">int</span> gridSize = (n + blockSize - <span class="num">1</span>) / blockSize;  <span class="cm">// enough blocks to cover n</span>
+    <span class="fn">vectorAdd</span>&lt;&lt;&lt;gridSize, blockSize&gt;&gt;&gt;(d_a, d_b, d_c, n);
+
+    <span class="cm">// ── Step 4: Copy result Device → Host ──</span>
+    <span class="fn">cudaMemcpy</span>(h_c, d_c, size, cudaMemcpyDeviceToHost);
+
+    <span class="cm">// ── Verify the result ──</span>
+    <span class="type">int</span> errors = <span class="num">0</span>;
+    <span class="kw">for</span> (<span class="type">int</span> i = <span class="num">0</span>; i &lt; n; i++) {
+        <span class="kw">if</span> (<span class="fn">fabs</span>(h_c[i] - <span class="num">3.0f</span>) &gt; <span class="num">1e-5</span>) {
+            errors++;
+        }
+    }
+    <span class="fn">printf</span>(<span class="str">"Vector addition: %s (%d errors)\n"</span>,
+           errors == <span class="num">0</span> ? <span class="str">"PASSED"</span> : <span class="str">"FAILED"</span>, errors);
+
+    <span class="cm">// ── Step 5: Free device and host memory ──</span>
+    <span class="fn">cudaFree</span>(d_a);
+    <span class="fn">cudaFree</span>(d_b);
+    <span class="fn">cudaFree</span>(d_c);
+    <span class="fn">free</span>(h_a);
+    <span class="fn">free</span>(h_b);
+    <span class="fn">free</span>(h_c);
+
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+    </div>
+
+    <h3>Line-by-Line Breakdown</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Lines</th>
+                    <th>What It Does</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>6-10</strong></td>
+                    <td>The <code>__global__</code> kernel. Each thread calculates its unique index <code>idx</code> and adds one element. The <code>if (idx &lt; n)</code> guard prevents out-of-bounds access when <code>n</code> is not a multiple of the block size.</td>
+                </tr>
+                <tr>
+                    <td><strong>13-15</strong></td>
+                    <td>Define problem size (1M floats) and byte count. All CUDA memory functions work in bytes.</td>
+                </tr>
+                <tr>
+                    <td><strong>18-24</strong></td>
+                    <td>Allocate and fill host arrays with test data: <code>1.0 + 2.0 = 3.0</code> for easy verification.</td>
+                </tr>
+                <tr>
+                    <td><strong>27-32</strong></td>
+                    <td><code>cudaMalloc</code> allocates GPU memory. Note the <code>(void**)</code> cast — it takes a pointer-to-pointer so it can write the allocated address back to your variable.</td>
+                </tr>
+                <tr>
+                    <td><strong>35-36</strong></td>
+                    <td><code>cudaMemcpy</code> transfers data across the PCIe bus. The fourth argument specifies the direction.</td>
+                </tr>
+                <tr>
+                    <td><strong>39-41</strong></td>
+                    <td>Launch with 256 threads per block and enough blocks to cover all elements. The <code>&lt;&lt;&lt;gridSize, blockSize&gt;&gt;&gt;</code> syntax is CUDA-specific.</td>
+                </tr>
+                <tr>
+                    <td><strong>44</strong></td>
+                    <td>Copy results back to host memory for verification.</td>
+                </tr>
+                <tr>
+                    <td><strong>47-52</strong></td>
+                    <td>Verify every element equals 3.0. In production you would use proper error checking (see Slide 06).</td>
+                </tr>
+                <tr>
+                    <td><strong>56-61</strong></td>
+                    <td>Free GPU memory with <code>cudaFree</code>, then host memory with <code>free</code>. Always clean up both.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">Naming Convention</div>
+        <p>By convention, host pointers use the <code>h_</code> prefix and device pointers use <code>d_</code>. This makes it obvious which address space a pointer belongs to and helps prevent accidentally passing a host pointer to a device function.</p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════ SLIDE 05 — Launch Syntax ═══════════════════════════════ -->
+<section class="slide" id="slide-05">
+    <div class="slide-number">05</div>
+    <h2>Kernel Launch Syntax Deep Dive</h2>
+
+    <p>The triple-chevron <code>&lt;&lt;&lt;...&gt;&gt;&gt;</code> syntax is how the host tells the GPU <strong>how many threads</strong> to launch and how to organise them.</p>
+
+    <div class="diagram-flow">
+        <div class="diagram-box accent">kernel</div>
+        <div class="diagram-box">&lt;&lt;&lt;</div>
+        <div class="diagram-box accent">gridDim</div>
+        <div class="diagram-box dim">,</div>
+        <div class="diagram-box accent">blockDim</div>
+        <div class="diagram-box dim">,</div>
+        <div class="diagram-box">sharedMem</div>
+        <div class="diagram-box dim">,</div>
+        <div class="diagram-box">stream</div>
+        <div class="diagram-box">&gt;&gt;&gt;</div>
+        <div class="diagram-box accent">(args...)</div>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Required</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>gridDim</strong></td>
+                    <td><code>dim3</code> or <code>int</code></td>
+                    <td>Yes</td>
+                    <td>Number of blocks in the grid (x, y, z)</td>
+                </tr>
+                <tr>
+                    <td><strong>blockDim</strong></td>
+                    <td><code>dim3</code> or <code>int</code></td>
+                    <td>Yes</td>
+                    <td>Number of threads per block (x, y, z)</td>
+                </tr>
+                <tr>
+                    <td><strong>sharedMem</strong></td>
+                    <td><code>size_t</code></td>
+                    <td>No</td>
+                    <td>Bytes of dynamically-allocated shared memory (default: 0)</td>
+                </tr>
+                <tr>
+                    <td><strong>stream</strong></td>
+                    <td><code>cudaStream_t</code></td>
+                    <td>No</td>
+                    <td>CUDA stream for async execution (default: stream 0)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Choosing Block Size</h3>
+    <p>Block size should always be a <strong>multiple of 32</strong> (the warp size). Common choices are 128, 256, or 512. Smaller blocks increase scheduling flexibility; larger blocks allow more shared memory reuse.</p>
+
+    <div class="code-block">
+        <div class="code-header">choosing_grid_size.cu</div>
+        <pre><code><span class="cm">// The standard formula: ceiling division</span>
+<span class="type">int</span> blockSize = <span class="num">256</span>;
+<span class="type">int</span> gridSize  = (n + blockSize - <span class="num">1</span>) / blockSize;
+
+<span class="cm">// Example: n = 1000</span>
+<span class="cm">//   gridSize = (1000 + 255) / 256 = 1255 / 256 = 4</span>
+<span class="cm">//   Total threads = 4 × 256 = 1024 (covers all 1000 elements)</span>
+<span class="cm">//   Threads 1000–1023 will hit the `if (idx &lt; n)` guard and exit</span>
+
+<span class="cm">// 2D grid example for matrix operations:</span>
+<span class="type">dim3</span> block(<span class="num">16</span>, <span class="num">16</span>);       <span class="cm">// 16×16 = 256 threads per block</span>
+<span class="type">dim3</span> grid(
+    (width  + block.x - <span class="num">1</span>) / block.x,
+    (height + block.y - <span class="num">1</span>) / block.y
+);
+<span class="fn">matrixKernel</span>&lt;&lt;&lt;grid, block&gt;&gt;&gt;(d_matrix, width, height);</code></pre>
+    </div>
+
+    <h3>Why Multiples of 32?</h3>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Block Size = 256</h4>
+            <p>256 / 32 = <strong>8 full warps</strong>. No wasted threads. Maximum hardware efficiency.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Block Size = 100</h4>
+            <p>100 / 32 = 3 full warps + 4 leftover threads. The last warp runs with 28 idle lanes — 12.5% waste.</p>
+        </div>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">Rule of Thumb</div>
+        <p>Start with <strong>256 threads per block</strong>. It is a safe default that works well on all NVIDIA architectures from Kepler to Blackwell. Optimise later with the CUDA Occupancy Calculator.</p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════ SLIDE 06 — Error Handling ═══════════════════════════════ -->
+<section class="slide" id="slide-06">
+    <div class="slide-number">06</div>
+    <h2>Error Handling</h2>
+
+    <p>CUDA functions return a <code>cudaError_t</code> status code. Kernel launches do <strong>not</strong> return an error directly — you must call <code>cudaGetLastError()</code> after the launch. <strong>Always check every CUDA call</strong> in development; silent failures are the #1 source of debugging pain.</p>
+
+    <h3>The Two Essential Checks</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Function</th>
+                    <th>When to Use</th>
+                    <th>What It Catches</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code><span class="fn">cudaGetLastError</span>()</code></td>
+                    <td>After every kernel launch</td>
+                    <td>Invalid launch configuration, missing kernel, invalid arguments</td>
+                </tr>
+                <tr>
+                    <td><code><span class="fn">cudaDeviceSynchronize</span>()</code></td>
+                    <td>After launch + getLastError</td>
+                    <td>Runtime errors inside the kernel (illegal memory access, assertions)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>The Macro Wrapper Pattern</h3>
+    <p>This macro wraps every CUDA API call and immediately checks for errors. It prints the file, line, and error message, then exits. Use it religiously during development.</p>
+
+    <div class="code-block">
+        <div class="code-header">cuda_check.cuh — error checking macro</div>
+        <pre><code><span class="dir">#ifndef</span> CUDA_CHECK_CUH
+<span class="dir">#define</span> CUDA_CHECK_CUH
+
+<span class="dir">#include</span> <span class="str">&lt;stdio.h&gt;</span>
+<span class="dir">#include</span> <span class="str">&lt;stdlib.h&gt;</span>
+<span class="dir">#include</span> <span class="str">&lt;cuda_runtime.h&gt;</span>
+
+<span class="dir">#define</span> <span class="mac">CUDA_CHECK</span>(call) \
+    <span class="kw">do</span> { \
+        <span class="type">cudaError_t</span> err = (call); \
+        <span class="kw">if</span> (err != cudaSuccess) { \
+            <span class="fn">fprintf</span>(stderr, <span class="str">"CUDA error at %s:%d — %s\n"</span>, \
+                    __FILE__, __LINE__, \
+                    <span class="fn">cudaGetErrorString</span>(err)); \
+            <span class="fn">exit</span>(EXIT_FAILURE); \
+        } \
+    } <span class="kw">while</span> (<span class="num">0</span>)
+
+<span class="dir">#endif</span></code></pre>
+    </div>
+
+    <h3>Using the Macro</h3>
+    <div class="code-block">
+        <div class="code-header">usage_example.cu</div>
+        <pre><code><span class="dir">#include</span> <span class="str">"cuda_check.cuh"</span>
+
+<span class="type">int</span> <span class="fn">main</span>(<span class="type">void</span>) {
+    <span class="type">float</span>* d_data;
+    <span class="mac">CUDA_CHECK</span>( <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_data, <span class="num">1024</span> * <span class="kw">sizeof</span>(<span class="type">float</span>)) );
+
+    <span class="cm">// Kernel launches don't return cudaError_t, so check after:</span>
+    <span class="fn">myKernel</span>&lt;&lt;&lt;<span class="num">4</span>, <span class="num">256</span>&gt;&gt;&gt;(d_data, <span class="num">1024</span>);
+    <span class="mac">CUDA_CHECK</span>( <span class="fn">cudaGetLastError</span>() );
+    <span class="mac">CUDA_CHECK</span>( <span class="fn">cudaDeviceSynchronize</span>() );
+
+    <span class="mac">CUDA_CHECK</span>( <span class="fn">cudaMemcpy</span>(h_data, d_data, <span class="num">1024</span> * <span class="kw">sizeof</span>(<span class="type">float</span>),
+                           cudaMemcpyDeviceToHost) );
+    <span class="mac">CUDA_CHECK</span>( <span class="fn">cudaFree</span>(d_data) );
+
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">Warning</div>
+        <p>Without error checking, a failed <code>cudaMalloc</code> gives you a null device pointer. The subsequent <code>cudaMemcpy</code> silently fails. The kernel silently crashes. You get garbage results with <strong>zero indication of what went wrong</strong>. Always use <code>CUDA_CHECK</code>.</p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════ SLIDE 07 — Compiling ═══════════════════════════════ -->
+<section class="slide" id="slide-07">
+    <div class="slide-number">07</div>
+    <h2>Compiling &amp; Running</h2>
+
+    <p>CUDA source files use the <code>.cu</code> extension and are compiled by <strong>nvcc</strong>, NVIDIA's CUDA compiler driver. Under the hood, nvcc separates host code (sent to your system C++ compiler) from device code (compiled to PTX and then to GPU machine code).</p>
+
+    <h3>Basic Compilation</h3>
+    <div class="code-block">
+        <div class="code-header">terminal</div>
+        <pre><code><span class="cm"># Compile and run the vector addition program</span>
+$ nvcc -o vector_add vector_add.cu
+$ ./vector_add
+Vector addition: PASSED (<span class="num">0</span> errors)</code></pre>
+    </div>
+
+    <h3>Useful nvcc Flags</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Flag</th>
+                    <th>Purpose</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>-arch=sm_XX</code></td>
+                    <td>Target a specific GPU architecture (compute capability)</td>
+                    <td><code>-arch=sm_89</code> for Ada Lovelace (RTX 4090)</td>
+                </tr>
+                <tr>
+                    <td><code>-O2</code> / <code>-O3</code></td>
+                    <td>Optimisation level (applied to both host and device)</td>
+                    <td><code>nvcc -O2 -o prog prog.cu</code></td>
+                </tr>
+                <tr>
+                    <td><code>-lineinfo</code></td>
+                    <td>Embed source line info for profiling tools (Nsight, compute-sanitizer)</td>
+                    <td><code>nvcc -lineinfo -o prog prog.cu</code></td>
+                </tr>
+                <tr>
+                    <td><code>-G</code></td>
+                    <td>Enable device-code debugging (disables optimisations)</td>
+                    <td><code>nvcc -G -g -o prog_debug prog.cu</code></td>
+                </tr>
+                <tr>
+                    <td><code>-Xcompiler</code></td>
+                    <td>Pass flags to the host compiler (gcc/cl.exe)</td>
+                    <td><code>-Xcompiler -Wall,-Wextra</code></td>
+                </tr>
+                <tr>
+                    <td><code>--ptxas-options=-v</code></td>
+                    <td>Show register and memory usage per kernel</td>
+                    <td>Useful for occupancy tuning</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Separate Compilation</h3>
+    <p>For larger projects, you can compile device code and host code separately, then link them:</p>
+
+    <div class="code-block">
+        <div class="code-header">terminal — separate compilation</div>
+        <pre><code><span class="cm"># Compile device code to relocatable device code</span>
+$ nvcc -dc -arch=sm_89 -o kernels.o kernels.cu
+
+<span class="cm"># Compile host code</span>
+$ nvcc -dc -arch=sm_89 -o main.o main.cu
+
+<span class="cm"># Link everything together</span>
+$ nvcc -arch=sm_89 -o program kernels.o main.o</code></pre>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">Tip</div>
+        <p>Not sure which <code>-arch</code> to use? Run <code>nvidia-smi</code> to find your GPU, then look up its compute capability on the <a href="https://developer.nvidia.com/cuda-gpus" style="color: var(--accent);">NVIDIA CUDA GPUs page</a>. Common values: sm_75 (Turing), sm_86 (Ampere), sm_89 (Ada Lovelace), sm_90 (Hopper), sm_100 (Blackwell).</p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════ SLIDE 08 — Exercises ═══════════════════════════════ -->
+<section class="slide" id="slide-08">
+    <div class="slide-number">08</div>
+    <h2>Exercises</h2>
+
+    <p>Hands-on practice is essential. Modify the vector addition code from Slide 04 and experiment with the ideas below.</p>
+
+    <h3>Exercise 1 — Element-wise Multiply</h3>
+    <p>Modify the <code>vectorAdd</code> kernel to perform <strong>element-wise multiplication</strong> instead of addition. Change the verification check to expect <code>1.0 * 2.0 = 2.0</code>.</p>
+
+    <div class="code-block">
+        <div class="code-header">vector_mul.cu — complete program</div>
+        <pre><code><span class="dir">#include</span> <span class="str">&lt;stdio.h&gt;</span>
+<span class="dir">#include</span> <span class="str">&lt;stdlib.h&gt;</span>
+<span class="dir">#include</span> <span class="str">&lt;math.h&gt;</span>
+<span class="dir">#include</span> <span class="str">&lt;cuda_runtime.h&gt;</span>
+
+<span class="kw">__global__</span> <span class="type">void</span> <span class="fn">vectorMul</span>(<span class="kw">const</span> <span class="type">float</span>* a, <span class="kw">const</span> <span class="type">float</span>* b, <span class="type">float</span>* c, <span class="type">int</span> n) {
+    <span class="type">int</span> idx = blockIdx.x * blockDim.x + threadIdx.x;
+    <span class="kw">if</span> (idx &lt; n) {
+        c[idx] = a[idx] * b[idx];
+    }
+}
+
+<span class="type">int</span> <span class="fn">main</span>(<span class="type">void</span>) {
+    <span class="type">int</span> n = <span class="num">1000000</span>;
+    <span class="type">size_t</span> size = n * <span class="kw">sizeof</span>(<span class="type">float</span>);
+
+    <span class="type">float</span>* h_a = (<span class="type">float</span>*)<span class="fn">malloc</span>(size);
+    <span class="type">float</span>* h_b = (<span class="type">float</span>*)<span class="fn">malloc</span>(size);
+    <span class="type">float</span>* h_c = (<span class="type">float</span>*)<span class="fn">malloc</span>(size);
+
+    <span class="kw">for</span> (<span class="type">int</span> i = <span class="num">0</span>; i &lt; n; i++) {
+        h_a[i] = <span class="num">1.0f</span>;
+        h_b[i] = <span class="num">2.0f</span>;
+    }
+
+    <span class="type">float</span>* d_a; <span class="type">float</span>* d_b; <span class="type">float</span>* d_c;
+    <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_a, size);
+    <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_b, size);
+    <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_c, size);
+
+    <span class="fn">cudaMemcpy</span>(d_a, h_a, size, cudaMemcpyHostToDevice);
+    <span class="fn">cudaMemcpy</span>(d_b, h_b, size, cudaMemcpyHostToDevice);
+
+    <span class="type">int</span> blockSize = <span class="num">256</span>;
+    <span class="type">int</span> gridSize = (n + blockSize - <span class="num">1</span>) / blockSize;
+    <span class="fn">vectorMul</span>&lt;&lt;&lt;gridSize, blockSize&gt;&gt;&gt;(d_a, d_b, d_c, n);
+
+    <span class="fn">cudaMemcpy</span>(h_c, d_c, size, cudaMemcpyDeviceToHost);
+
+    <span class="type">int</span> errors = <span class="num">0</span>;
+    <span class="kw">for</span> (<span class="type">int</span> i = <span class="num">0</span>; i &lt; n; i++) {
+        <span class="kw">if</span> (<span class="fn">fabs</span>(h_c[i] - <span class="num">2.0f</span>) &gt; <span class="num">1e-5</span>) errors++;
+    }
+    <span class="fn">printf</span>(<span class="str">"Vector multiply: %s (%d errors)\n"</span>,
+           errors == <span class="num">0</span> ? <span class="str">"PASSED"</span> : <span class="str">"FAILED"</span>, errors);
+
+    <span class="fn">cudaFree</span>(d_a); <span class="fn">cudaFree</span>(d_b); <span class="fn">cudaFree</span>(d_c);
+    <span class="fn">free</span>(h_a); <span class="fn">free</span>(h_b); <span class="fn">free</span>(h_c);
+
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+    </div>
+
+    <h3>Exercise 2 — Block Size Experiment</h3>
+    <p>Run the vector addition program with different block sizes and observe the effect on timing. Use CUDA events for accurate measurement:</p>
+
+    <div class="code-block">
+        <div class="code-header">timing_experiment.cu — complete program</div>
+        <pre><code><span class="dir">#include</span> <span class="str">&lt;stdio.h&gt;</span>
+<span class="dir">#include</span> <span class="str">&lt;stdlib.h&gt;</span>
+<span class="dir">#include</span> <span class="str">&lt;cuda_runtime.h&gt;</span>
+
+<span class="kw">__global__</span> <span class="type">void</span> <span class="fn">vectorAdd</span>(<span class="kw">const</span> <span class="type">float</span>* a, <span class="kw">const</span> <span class="type">float</span>* b, <span class="type">float</span>* c, <span class="type">int</span> n) {
+    <span class="type">int</span> idx = blockIdx.x * blockDim.x + threadIdx.x;
+    <span class="kw">if</span> (idx &lt; n) {
+        c[idx] = a[idx] + b[idx];
+    }
+}
+
+<span class="type">int</span> <span class="fn">main</span>(<span class="type">void</span>) {
+    <span class="type">int</span> n = <span class="num">10000000</span>;  <span class="cm">// 10 million elements</span>
+    <span class="type">size_t</span> size = n * <span class="kw">sizeof</span>(<span class="type">float</span>);
+
+    <span class="type">float</span>* h_a = (<span class="type">float</span>*)<span class="fn">malloc</span>(size);
+    <span class="type">float</span>* h_b = (<span class="type">float</span>*)<span class="fn">malloc</span>(size);
+    <span class="type">float</span>* h_c = (<span class="type">float</span>*)<span class="fn">malloc</span>(size);
+
+    <span class="kw">for</span> (<span class="type">int</span> i = <span class="num">0</span>; i &lt; n; i++) {
+        h_a[i] = <span class="num">1.0f</span>;
+        h_b[i] = <span class="num">2.0f</span>;
+    }
+
+    <span class="type">float</span>* d_a; <span class="type">float</span>* d_b; <span class="type">float</span>* d_c;
+    <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_a, size);
+    <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_b, size);
+    <span class="fn">cudaMalloc</span>((<span class="type">void</span>**)&amp;d_c, size);
+
+    <span class="fn">cudaMemcpy</span>(d_a, h_a, size, cudaMemcpyHostToDevice);
+    <span class="fn">cudaMemcpy</span>(d_b, h_b, size, cudaMemcpyHostToDevice);
+
+    <span class="type">int</span> blockSizes[] = {<span class="num">32</span>, <span class="num">64</span>, <span class="num">128</span>, <span class="num">256</span>, <span class="num">512</span>, <span class="num">1024</span>};
+    <span class="type">int</span> numTests = <span class="num">6</span>;
+
+    <span class="kw">for</span> (<span class="type">int</span> t = <span class="num">0</span>; t &lt; numTests; t++) {
+        <span class="type">int</span> bs = blockSizes[t];
+        <span class="type">int</span> gs = (n + bs - <span class="num">1</span>) / bs;
+
+        <span class="type">cudaEvent_t</span> start, stop;
+        <span class="fn">cudaEventCreate</span>(&amp;start);
+        <span class="fn">cudaEventCreate</span>(&amp;stop);
+
+        <span class="fn">cudaEventRecord</span>(start);
+        <span class="fn">vectorAdd</span>&lt;&lt;&lt;gs, bs&gt;&gt;&gt;(d_a, d_b, d_c, n);
+        <span class="fn">cudaEventRecord</span>(stop);
+        <span class="fn">cudaEventSynchronize</span>(stop);
+
+        <span class="type">float</span> ms = <span class="num">0.0f</span>;
+        <span class="fn">cudaEventElapsedTime</span>(&amp;ms, start, stop);
+        <span class="fn">printf</span>(<span class="str">"Block size %4d → %8d blocks → %.4f ms\n"</span>, bs, gs, ms);
+
+        <span class="fn">cudaEventDestroy</span>(start);
+        <span class="fn">cudaEventDestroy</span>(stop);
+    }
+
+    <span class="fn">cudaFree</span>(d_a); <span class="fn">cudaFree</span>(d_b); <span class="fn">cudaFree</span>(d_c);
+    <span class="fn">free</span>(h_a); <span class="fn">free</span>(h_b); <span class="fn">free</span>(h_c);
+
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+    </div>
+
+    <div class="callout">
+        <div class="callout-label">Expected Observation</div>
+        <p>For this memory-bandwidth-bound kernel, you should see similar timings across block sizes 128-512. The kernel is so simple that occupancy differences are masked by memory throughput. In compute-bound kernels, block size matters more.</p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════ SLIDE 09 — Summary ═══════════════════════════════ -->
+<section class="slide" id="slide-09">
+    <div class="slide-number">09</div>
+    <h2>Summary &amp; Next Steps</h2>
+
+    <h3>What We Covered</h3>
+    <ul>
+        <li><strong>CUDA Toolkit setup</strong> — install, verify with <code>nvcc --version</code> and <code>nvidia-smi</code></li>
+        <li><strong>Host vs Device</strong> — CPU orchestrates, GPU executes; <code>__global__</code>, <code>__device__</code>, <code>__host__</code> qualifiers</li>
+        <li><strong>The CUDA workflow</strong> — allocate, copy H&rarr;D, launch, copy D&rarr;H, free</li>
+        <li><strong>Vector addition</strong> — a complete, compilable first program</li>
+        <li><strong>Launch syntax</strong> — <code>&lt;&lt;&lt;gridDim, blockDim, sharedMem, stream&gt;&gt;&gt;</code></li>
+        <li><strong>Error handling</strong> — <code>cudaGetLastError()</code>, <code>cudaDeviceSynchronize()</code>, and the <code>CUDA_CHECK</code> macro</li>
+        <li><strong>Compilation</strong> — <code>nvcc</code> flags, separate compilation, architecture targets</li>
+    </ul>
+
+    <h3>Key Takeaways</h3>
+    <div class="diagram-grid cols-3">
+        <div class="diagram-panel accent-border">
+            <h4>Memory Matters</h4>
+            <p>Host and device memory are separate. Every byte crosses the PCIe bus. Minimise transfers.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Think in Blocks</h4>
+            <p>Block size should be a multiple of 32. Use the ceiling-division formula for grid size.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Check Everything</h4>
+            <p>Wrap every CUDA call in <code>CUDA_CHECK</code>. Silent failures are the enemy.</p>
+        </div>
+    </div>
+
+    <h3>Next Tutorial</h3>
+    <div class="callout">
+        <div class="callout-label">Up Next</div>
+        <p><strong><a href="https://brendanjameslynskey.github.io/CUDA_03_Thread_Hierarchy/" style="color: var(--accent); text-decoration: none;">Tutorial 03 — Thread Hierarchy</a></strong> — deep dive into grids, blocks, and threads. We will explore <code>threadIdx</code>, <code>blockIdx</code>, <code>blockDim</code>, and <code>gridDim</code> in 1D, 2D, and 3D configurations, and learn how to map thread indices to data for matrix operations.</p>
+    </div>
+</section>
+
+<!-- ════════════════════════════════════ Footer ════════════════════════════════════ -->
+<footer class="footer">
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLMs#cuda-programming">CUDA Programming Series</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">Your First CUDA Kernel — Tutorial 02 of 10</p>
+</footer>
+
+<script>
+    // Smooth scroll for table-of-contents links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+
+    // Subtle fade-in animation for slides on scroll
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.slide').forEach(slide => {
+        slide.style.opacity = '0';
+        slide.style.transform = 'translateY(30px)';
+        slide.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(slide);
+    });
+</script>
+
+</body>
+</html>
